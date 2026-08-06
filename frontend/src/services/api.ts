@@ -1,6 +1,20 @@
 import axios from 'axios';
 
-const api = axios.create({ baseURL: '/api', headers: { 'Content-Type': 'application/json' } });
+declare global {
+  interface ImportMetaEnv {
+    readonly VITE_API_BASE_URL: string;
+  }
+  interface ImportMeta {
+    readonly env: ImportMetaEnv;
+  }
+}
+
+const api = axios.create({
+    baseURL: `${import.meta.env.VITE_API_BASE_URL}/api`,
+    headers: {
+        "Content-Type": "application/json",
+    },
+});
 api.interceptors.request.use(c => { const t=localStorage.getItem('token'); if(t) c.headers.Authorization=`Bearer ${t}`; return c; });
 api.interceptors.response.use(r=>r, e=>{ if(e.response?.status===401){localStorage.clear();window.location.href='/login';} return Promise.reject(e); });
 
