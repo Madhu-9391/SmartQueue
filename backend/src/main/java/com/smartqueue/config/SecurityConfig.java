@@ -34,8 +34,10 @@ public class SecurityConfig {
     @Value("${app.cors.allowed-origins}")
     private String allowedOrigins;
 
-    @Bean public PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
-
+@Bean
+public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder(8);
+}
     @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider p = new DaoAuthenticationProvider();
