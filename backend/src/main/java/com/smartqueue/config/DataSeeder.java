@@ -34,10 +34,16 @@ public class DataSeeder {
             Department cardio = departmentRepo.save(Department.builder().name("Cardiology").hospitalName("City Hospital").floor("2nd").build());
             Department general = departmentRepo.save(Department.builder().name("General").hospitalName("City Hospital").floor("Ground").build());
 
-            Doctor dr1 = doctorRepo.save(Doctor.builder().name("Dr. Priya Nair").specialization("Cardiologist").avgConsultationTime(14).roomNumber("OPD-3").availabilityStatus(Doctor.AvailabilityStatus.AVAILABLE).delayMinutes(0).build());
-            Doctor dr2 = doctorRepo.save(Doctor.builder().name("Dr. Arun Mehta").specialization("General Physician").avgConsultationTime(8).roomNumber("OPD-1").availabilityStatus(Doctor.AvailabilityStatus.AVAILABLE).delayMinutes(0).build());
-            Doctor dr3 = doctorRepo.save(Doctor.builder().name("Dr. Sunita Rao").specialization("Neurologist").avgConsultationTime(18).roomNumber("OPD-5").availabilityStatus(Doctor.AvailabilityStatus.AVAILABLE).delayMinutes(0).build());
-            Doctor dr4 = doctorRepo.save(Doctor.builder().name("Dr. Kiran Patel").specialization("Orthopedist").avgConsultationTime(12).roomNumber("OPD-2").availabilityStatus(Doctor.AvailabilityStatus.AVAILABLE).delayMinutes(0).build());
+            final String doctorPassword = passwordEncoder.encode("password");
+            userRepo.save(User.builder().name("Dr. Priya Nair").email("doctor.priya@demo.com").password(doctorPassword).role(User.Role.DOCTOR).phone("+91 98765 40001").build());
+            userRepo.save(User.builder().name("Dr. Arun Mehta").email("doctor.arun@demo.com").password(doctorPassword).role(User.Role.DOCTOR).phone("+91 98765 40002").build());
+            userRepo.save(User.builder().name("Dr. Sunita Rao").email("doctor.sunita@demo.com").password(doctorPassword).role(User.Role.DOCTOR).phone("+91 98765 40003").build());
+            userRepo.save(User.builder().name("Dr. Kiran Patel").email("doctor.kiran@demo.com").password(doctorPassword).role(User.Role.DOCTOR).phone("+91 98765 40004").build());
+
+            Doctor dr1 = doctorRepo.save(Doctor.builder().name("Dr. Priya Nair").specialization("Cardiologist").avgConsultationTime(14).roomNumber("OPD-3").availabilityStatus(Doctor.AvailabilityStatus.AVAILABLE).delayMinutes(0).linkedEmail("doctor.priya@demo.com").build());
+            Doctor dr2 = doctorRepo.save(Doctor.builder().name("Dr. Arun Mehta").specialization("General Physician").avgConsultationTime(8).roomNumber("OPD-1").availabilityStatus(Doctor.AvailabilityStatus.AVAILABLE).delayMinutes(0).linkedEmail("doctor.arun@demo.com").build());
+            Doctor dr3 = doctorRepo.save(Doctor.builder().name("Dr. Sunita Rao").specialization("Neurologist").avgConsultationTime(18).roomNumber("OPD-5").availabilityStatus(Doctor.AvailabilityStatus.AVAILABLE).delayMinutes(0).linkedEmail("doctor.sunita@demo.com").build());
+            Doctor dr4 = doctorRepo.save(Doctor.builder().name("Dr. Kiran Patel").specialization("Orthopedist").avgConsultationTime(12).roomNumber("OPD-2").availabilityStatus(Doctor.AvailabilityStatus.AVAILABLE).delayMinutes(0).linkedEmail("doctor.kiran@demo.com").build());
 
             PatientQueue q1 = queueRepo.save(PatientQueue.builder().queueName("Cardiology OPD").doctor(dr1).department(cardio).status(PatientQueue.QueueStatus.ACTIVE).currentToken(0).maxCapacity(50).build());
             PatientQueue q2 = queueRepo.save(PatientQueue.builder().queueName("General OPD").doctor(dr2).department(general).status(PatientQueue.QueueStatus.ACTIVE).currentToken(0).maxCapacity(50).build());

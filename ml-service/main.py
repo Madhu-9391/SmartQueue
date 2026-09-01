@@ -193,21 +193,23 @@ class ModelRegistry:
         y = (positions * speeds + emergs * 12 - positions * no_shows * speeds + delays + noise).clip(2)
 
         self.scaler = StandardScaler()
-        X_scaled = self.scaler.fit_transform(X)
+
+        X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.2, random_state=42)
+        self.scaler = StandardScaler()
+        X_tr = self.scaler.fit_transform(X_tr)
+        X_te = self.scaler.transform(X_te)
 
         self.model = RandomForestRegressor(
             n_estimators=100, max_depth=8, min_samples_leaf=3,
             random_state=42, n_jobs=-1,
         )
-        self.model.fit(X_scaled, y)
+        self.model.fit(X_tr, y_tr)
 
         MODEL_PATH.parent.mkdir(exist_ok=True)
         with open(MODEL_PATH, "wb") as f: pickle.dump(self.model, f)
         with open(SCALER_PATH, "wb") as f: pickle.dump(self.scaler, f)
 
-        # Evaluate
-        X_tr, X_te, y_tr, y_te = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
-        self.model.fit(X_tr, y_tr)
+        # Evaluate only on held-out data
         preds = self.model.predict(X_te)
         mae  = float(mean_absolute_error(y_te, preds))
         rmse = float(np.sqrt(mean_squared_error(y_te, preds)))
@@ -282,7 +284,7 @@ def predict(req: PredictRequest):
     # Clamp confidence to a sensible range
     conf_window = max(3, min(20, int(round(std * 1.5))))
 
-    visit_time = datetime.utcnow() + timedelta(minutes=wait_mins)
+    visit_time = datetime.now().astimezone() + timedelta(minutes=wait_mins)
 
     return PredictResponse(
         predicted_wait_minutes=int(round(wait_mins)),
@@ -303,7 +305,7 @@ def predict_batch(body: BatchPredictRequest):
         try:
             wait_mins, std = registry.predict_one(req)
             conf_window = max(3, min(20, int(round(std * 1.5))))
-            visit_time  = datetime.utcnow() + timedelta(minutes=wait_mins)
+            visit_time  = datetime.now().astimezone() + timedelta(minutes=wait_mins)
             results.append({
                 "predicted_wait_minutes": int(round(wait_mins)),
                 "predicted_visit_time": visit_time.isoformat(),

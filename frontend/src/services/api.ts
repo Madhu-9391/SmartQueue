@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 declare global {
   interface ImportMetaEnv {
@@ -10,13 +10,28 @@ declare global {
 }
 
 const api = axios.create({
-    baseURL: `${import.meta.env.VITE_API_BASE_URL}/api`,
+    baseURL: `${import.meta.env.VITE_API_BASE_URL || ''}/api`,
+    timeout: 8000,
     headers: {
         "Content-Type": "application/json",
     },
 });
-api.interceptors.request.use(c => { const t=localStorage.getItem('token'); if(t) c.headers.Authorization=`Bearer ${t}`; return c; });
-api.interceptors.response.use(r=>r, e=>{ if(e.response?.status===401){localStorage.clear();window.location.href='/login';} return Promise.reject(e); });
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  const token = localStorage.getItem('token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+api.interceptors.response.use(
+  response => response,
+  (error: AxiosError) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      if (window.location.pathname !== '/login') window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
 
 // ─── Types ────────────────────────────────────────────────────
 export interface AuthResponse { token:string;userId:number;name:string;email:string;role:string; }
@@ -55,6 +70,7 @@ export const authApi = {
 export const doctorApi = {
   listAll:()=>api.get<{data:DoctorResponse[]}>('/doctors'),
   getById:(id:number)=>api.get<{data:DoctorResponse}>(`/doctors/${id}`),
+  getMe:()=>api.get<{data:DoctorResponse}>('/doctors/me'),
 };
 
 // ─── Appointments ─────────────────────────────────────────────
@@ -89,6 +105,7 @@ export const paymentApi = {
 export const doctorPortalApi = {
   getMyQueue:(doctorId:number)=>api.get<{data:AppointmentResponse[]}>(`/doctor-portal/my-queue/${doctorId}`),
   getStats:(doctorId:number)=>api.get<{data:DoctorStatsResponse}>(`/doctor-portal/stats/${doctorId}`),
+  callNext:(doctorId:number)=>api.put<{data:AppointmentResponse}>(`/doctor-portal/${doctorId}/next`),
   markDone:(doctorId:number,apptId:number)=>api.put<{data:AppointmentResponse}>(`/doctor-portal/${doctorId}/appointments/${apptId}/done`),
   markNoShow:(doctorId:number,apptId:number)=>api.put(`/doctor-portal/${doctorId}/appointments/${apptId}/no-show`),
   updateAvailability:(doctorId:number,status:string)=>api.put(`/doctor-portal/${doctorId}/availability?status=${status}`),
@@ -123,12 +140,13 @@ export const adminApi = {
   cancelAppointment:(id:number,reason?:string)=>api.put(`/admin/appointments/${id}/cancel`,{reason}),
   markNoShow:(id:number)=>api.put(`/admin/appointments/${id}/no-show`),
   broadcast:(queueId:number,message:string)=>api.post(`/admin/notify/broadcast?queueId=${queueId}&message=${encodeURIComponent(message)}`),
-  kioskRegister:(d:{name:string;phone:string;priority:string;doctorId:number;queueId:number})=>api.post<{data:AppointmentResponse}>('/admin/kiosk/register',d),
+  kioskRegister:(d:{name:string;phone:string;priority:string;doctorId:number;queueId:number})=>api.post<{data:AppointmentResponse}>('/kiosk/register',d),
 };
 
 // ─── Notifications ────────────────────────────────────────────
 export const notifApi = {
   getAll:()=>api.get('/notifications'),
+  markRead:(id:number)=>api.put(`/notifications/${id}/read`),
   markAllRead:()=>api.put('/notifications/read-all'),
 };
 

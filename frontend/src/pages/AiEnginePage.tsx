@@ -19,7 +19,7 @@ const FEATURES = [
 const ML_STEPS = [
   { icon: '📦', title: 'Data collection',        sub: 'consultation_history records duration, delays, interruptions per consultation', bg: '#ccfbf1', c: '#0d9488' },
   { icon: '⚙️', title: 'Feature engineering',    sub: '12 features: queue_pos, doctor_speed, time_of_day, day_of_week, no_show_prob, emergency_count…', bg: '#dbeafe', c: '#2563eb' },
-  { icon: '🤖', title: 'Model training',          sub: 'Random Forest Regressor — 200 trees, max_depth=10, trained on historical consultations', bg: '#ede9fe', c: '#7c3aed' },
+  { icon: '🤖', title: 'Model training',          sub: 'Optional Python Random Forest service with Java fallback for low-latency ETA prediction', bg: '#ede9fe', c: '#7c3aed' },
   { icon: '⚡', title: 'FastAPI serving',         sub: 'Python microservice at POST /predict — returns prediction in <50ms with per-tree confidence', bg: '#fef3c7', c: '#d97706' },
   { icon: '🔁', title: 'Dynamic recalculation',  sub: 'Re-predicts on: cancellation, delay update, emergency insert, no-show detection', bg: '#dcfce7', c: '#16a34a' },
   { icon: '📡', title: 'WebSocket push',          sub: 'eta-updated STOMP event broadcasts instantly to all connected patient browsers', bg: '#fee2e2', c: '#dc2626' },
@@ -77,7 +77,7 @@ export const AiEnginePage = () => {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-5">
       <div>
         <h1 className="text-lg font-semibold text-gray-800">AI Prediction Engine</h1>
-        <p className="text-sm text-gray-400 mt-0.5">Feature-weighted ML model · Random Forest · Real-time ETA predictions</p>
+        <p className="text-sm text-gray-400 mt-0.5">Hybrid prediction engine · Optional Random Forest · Real-time ETA predictions</p>
       </div>
 
       {/* Live model stats — from real analytics */}

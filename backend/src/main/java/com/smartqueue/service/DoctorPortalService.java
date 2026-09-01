@@ -21,6 +21,7 @@ public class DoctorPortalService {
     private final AiPredictionService predictionService;
     private final SocketEventPublisher publisher;
     private final NotificationDispatchService notifDispatch;
+    private final QueueService queueService;
 
     /**
      * BUG 4 FIX: Match doctor entity to logged-in user by name.
@@ -72,12 +73,23 @@ public class DoctorPortalService {
     }
 
     @Transactional
+    public AppointmentResponse callNext(Long doctorId) {
+        if (!doctorRepo.existsById(doctorId)) throw new RuntimeException("Doctor not found");
+        PatientQueue queue = queueService.getActiveQueueEntityByDoctorId(doctorId);
+        return queueService.callNextToken(queue.getId());
+    }
+
+    @Transactional
     public AppointmentResponse markDone(Long doctorId, Long appointmentId) {
         Appointment appt = apptRepo.findById(appointmentId)
                 .orElseThrow(() -> new RuntimeException("Appointment not found"));
         // BUG 4 FIX: strict ownership check
         if (!appt.getDoctor().getId().equals(doctorId))
             throw new RuntimeException("Access denied: this appointment belongs to another doctor.");
+        if (appt.getStatus() != Appointment.AppointmentStatus.ACTIVE)
+            throw new RuntimeException("Only the active appointment can be marked done.");
+        if (appt.getActualStartTime() == null)
+            appt.setActualStartTime(LocalDateTime.now());
         appt.setStatus(Appointment.AppointmentStatus.COMPLETED);
         appt.setActualEndTime(LocalDateTime.now());
         apptRepo.save(appt);
@@ -133,6 +145,6 @@ public class DoctorPortalService {
                 .status(a.getStatus().name()).priority(a.getPriority().name())
                 .predictedVisitTime(a.getPredictedVisitTime())
                 .predictionConfidence(a.getPredictionConfidence())
-                .createdAt(a.getCreatedAt()).build();
+                .createdAt(a.getCreatedAt()).paymentRequired(a.getPaymentRequired()).paymentStatus(a.getPaymentStatus() != null ? a.getPaymentStatus().name() : null).build();
     }
 }

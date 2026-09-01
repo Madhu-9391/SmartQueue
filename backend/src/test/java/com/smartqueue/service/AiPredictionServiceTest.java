@@ -27,7 +27,7 @@ class AiPredictionServiceTest {
     AiPredictionService predictionService;
 
     private Doctor doctor;
-    private Queue queue;
+    private PatientQueue queue;
     private User user;
     private Appointment appointment;
 
@@ -37,9 +37,9 @@ class AiPredictionServiceTest {
                 .id(1L).name("Dr. Test").specialization("Cardiology")
                 .avgConsultationTime(15).delayMinutes(0).build();
 
-        queue = Queue.builder()
+        queue = PatientQueue.builder()
                 .id(1L).queueName("Test Queue")
-                .doctor(doctor).status(Queue.QueueStatus.ACTIVE).build();
+                .doctor(doctor).status(PatientQueue.QueueStatus.ACTIVE).build();
 
         user = User.builder()
                 .id(1L).name("Test Patient").email("test@test.com").build();

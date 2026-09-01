@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { analyticsApi, AnalyticsDashboard, QueueStatus } from '../services/api';
 import { useSocket } from '../hooks/useSocket';
 import { useAuth } from '../context/AuthContext';
-import QueueSocket from "./QueueSocket";
+import { Scene, HoloMetric } from '../components/ThreeD';
 import { Card, CardTitle, StatCard, Badge, LiveDot, Empty, Spinner } from '../components/UI';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -44,19 +44,16 @@ export const DashboardPage = () => {
   useEffect(() => {
     fetchData();
     addEvent('Dashboard loaded — live data connected', '#0d9488');
-    addEvent('WebSocket listening for queue events', '#16a34a');
   }, [fetchData]);
 
-  // Subscribe to all active queue IDs
-  {queues.map(q => (
-  <QueueSocket
-    key={q.queueId}
-    queueId={q.queueId}
-    queueName={q.queueName}
-    fetchData={fetchData}
-    addEvent={addEvent}
-  />
-))}
+  const queueIds = queues.map(q => q.queueId);
+  useSocket({
+    queueIds,
+    onQueueUpdated: () => fetchData(),
+    onTokenCalled: (d) => addEvent(`Token T-${d?.tokenNumber ?? '?'} called`, '#7c3aed'),
+    onEtaUpdated: () => addEvent('AI re-predicted ETAs', '#d97706'),
+    onDoctorDelayed: (d) => addEvent(`Doctor delayed ${d?.delayMinutes ?? 0} min`, '#dc2626'),
+  });
 
   if (loading) return <div className="flex justify-center py-20"><Spinner size={32} /></div>;
 
@@ -71,22 +68,24 @@ export const DashboardPage = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-5">
-
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-gray-800">Dashboard</h1>
-          <p className="text-sm text-gray-400">Welcome back, {user?.name} · Live data</p>
+      <Scene>
+        <div className="relative z-10 flex flex-col gap-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[.18em] text-teal-200/70">SmartQueue Command Center</p>
+              <h1 className="mt-1 text-3xl sm:text-4xl font-black tracking-tight">Hospital flow, without the guesswork.</h1>
+              <p className="mt-2 max-w-2xl text-sm text-slate-300">Live queue telemetry, AI-assisted ETAs and operational pressure in one view.</p>
+            </div>
+            <LiveDot />
+          </div>
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+            <HoloMetric label="Waiting now" value={analytics?.totalWaitingNow ?? 0} detail="all active queues" tone="blue" />
+            <HoloMetric label="Completed today" value={analytics?.totalCompletedToday ?? 0} detail="consultations closed" tone="teal" />
+            <HoloMetric label="Average wait" value={analytics?.avgWaitingTimeToday ? `${analytics.avgWaitingTimeToday.toFixed(1)}m` : '—'} detail="measured today" tone="purple" />
+            <HoloMetric label="No-show rate" value={analytics?.noShowRateToday ? `${(analytics.noShowRateToday * 100).toFixed(1)}%` : '0%'} detail={`${analytics?.totalNoShowsToday ?? 0} today`} tone="amber" />
+          </div>
         </div>
-        <LiveDot />
-      </div>
-
-      {/* Real metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Waiting now"     value={analytics?.totalWaitingNow ?? 0}     color="blue"   sub="across all queues" />
-        <StatCard label="Completed today" value={analytics?.totalCompletedToday ?? 0} color="green"  sub="consultations done" />
-        <StatCard label="Avg wait time"   value={analytics?.avgWaitingTimeToday ? `${analytics.avgWaitingTimeToday.toFixed(1)}m` : '—'} color="teal" sub="real measured avg" />
-        <StatCard label="No-show rate"    value={analytics?.noShowRateToday ? `${(analytics.noShowRateToday * 100).toFixed(1)}%` : '0%'} color="amber" sub={`${analytics?.totalNoShowsToday ?? 0} today`} />
-      </div>
+      </Scene>
 
       {/* Live queues */}
       {queues.length === 0 ? (

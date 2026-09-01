@@ -116,12 +116,16 @@ public class AdminController {
             @RequestBody Map<String, String> body) {
         String name  = body.get("name");
         String email = body.get("email");
-        String password = body.getOrDefault("password", "doctor@123");
+        String password = body.get("password");
         String role  = body.getOrDefault("role", "DOCTOR");
         String phone = body.get("phone");
 
         if (!List.of("DOCTOR", "ADMIN").contains(role.toUpperCase()))
             throw new RuntimeException("Only DOCTOR or ADMIN roles can be created here");
+        if (name == null || name.isBlank() || email == null || email.isBlank())
+            throw new RuntimeException("Name and email are required.");
+        if (password == null || password.length() < 12)
+            throw new RuntimeException("Staff password must be at least 12 characters.");
 
         if (userRepo.existsByEmail(email))
             throw new IllegalArgumentException("Email already registered: " + email);
@@ -184,7 +188,7 @@ public class AdminController {
 
     // ─── APPOINTMENT MANAGEMENT ───────────────────────────────
     @GetMapping("/appointments")
-    public ResponseEntity<ApiResponse<List<Appointment>>> listAppointments(
+    public ResponseEntity<ApiResponse<List<AppointmentResponse>>> listAppointments(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Long doctorId) {
         Appointment.AppointmentStatus s = null;
@@ -192,7 +196,14 @@ public class AdminController {
             try { s = Appointment.AppointmentStatus.valueOf(status.toUpperCase()); }
             catch (IllegalArgumentException ignored) {}
         }
-        return ResponseEntity.ok(ApiResponse.ok(apptRepo.findAllFiltered(s, doctorId)));
+        List<AppointmentResponse> result = apptRepo.findAllFiltered(s, doctorId).stream().map(a -> AppointmentResponse.builder()
+                .id(a.getId()).patientName(a.getUser().getName()).doctorName(a.getDoctor().getName())
+                .doctorSpecialization(a.getDoctor().getSpecialization()).tokenNumber(a.getTokenNumber())
+                .status(a.getStatus().name()).priority(a.getPriority().name()).appointmentDate(a.getAppointmentDate())
+                .createdAt(a.getCreatedAt()).predictedVisitTime(a.getPredictedVisitTime())
+                .predictionConfidence(a.getPredictionConfidence()).lastPredictionUpdated(a.getLastPredictionUpdated()).build())
+                .toList();
+        return ResponseEntity.ok(ApiResponse.ok(result));
     }
 
     @PutMapping("/appointments/{id}/priority")
@@ -265,64 +276,5 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.ok("Broadcast sent", null));
     }
 
-    /**
-     * BUG 3 FIX: Kiosk register — fixed NPE + proper user creation
-     */
-    @PostMapping("/kiosk/register")
-    @Operation(summary = "Walk-in kiosk registration — no auth required")
-    public ResponseEntity<ApiResponse<AppointmentResponse>> kioskRegister(
-            @Valid @RequestBody KioskRegisterRequest req) {
-        // Find or create patient by phone
-        User user = userRepo.findByPhone(req.getPhone()).orElseGet(() -> {
-            // Generate unique email from phone
-            String email = "kiosk_" + req.getPhone().replaceAll("[^0-9]", "") + "@smartqueue.local";
-            if (userRepo.existsByEmail(email)) {
-                // Return existing kiosk user
-                return userRepo.findByEmail(email).orElseThrow();
-            }
-            return userRepo.save(User.builder()
-                    .name(req.getName())
-                    .phone(req.getPhone())
-                    .email(email)
-                    .password(passwordEncoder.encode("kiosk_no_login_" + req.getPhone()))
-                    .role(User.Role.PATIENT)
-                    .build());
-        });
 
-        Doctor doctor = doctorRepo.findById(req.getDoctorId())
-                .orElseThrow(() -> new RuntimeException("Doctor not found: " + req.getDoctorId()));
-        PatientQueue queue = queueRepo.findById(req.getQueueId())
-                .orElseThrow(() -> new RuntimeException("Queue not found: " + req.getQueueId()));
-
-        if (queue.getStatus() != PatientQueue.QueueStatus.ACTIVE)
-            throw new RuntimeException("Queue is not active");
-
-        long waiting = apptRepo.countWaitingByQueueId(queue.getId());
-        if (waiting >= queue.getMaxCapacity())
-            throw new RuntimeException("Queue is full (" + queue.getMaxCapacity() + " patients). Please choose another doctor.");
-
-        Appointment.Priority priority;
-        try { priority = Appointment.Priority.valueOf(req.getPriority().toUpperCase()); }
-        catch (Exception e) { priority = Appointment.Priority.NORMAL; }
-
-        Appointment appt = Appointment.builder()
-                .user(user).doctor(doctor).queue(queue)
-                .appointmentDate(LocalDateTime.now())
-                .tokenNumber((int) waiting + 1)
-                .priority(priority)
-                .status(Appointment.AppointmentStatus.WAITING)
-                .paymentRequired(false)
-                .paymentStatus(Payment.PaymentStatus.PAID)
-                .rescheduleCount(0)
-                .build();
-        appt = apptRepo.save(appt);
-        publisher.publishQueueUpdated(queue.getId());
-
-        return ResponseEntity.ok(ApiResponse.ok("Walk-in registered",
-                AppointmentResponse.builder()
-                        .id(appt.getId()).patientName(user.getName())
-                        .doctorName(doctor.getName()).tokenNumber(appt.getTokenNumber())
-                        .status(appt.getStatus().name()).priority(appt.getPriority().name())
-                        .createdAt(appt.getCreatedAt()).build()));
-    }
 }

@@ -21,7 +21,7 @@ export const Badge = ({ label }: { label: string }) => (
 
 // ─── CARD ─────────────────────────────────────────────────────
 export const Card = ({ children, className = '' }: { children: ReactNode; className?: string }) => (
-  <div className={`bg-white rounded-xl border border-gray-100 shadow-sm p-4 ${className}`}>
+  <div className={`glass-panel rounded-2xl p-4 ${className}`}>
     {children}
   </div>
 );
@@ -39,7 +39,7 @@ export const StatCard = ({ label, value, sub, color = 'teal' }: {
     amber: 'text-amber-600', green: 'text-green-600', purple: 'text-purple-600',
   };
   return (
-    <div className="bg-gray-50 rounded-lg p-3">
+    <div className="metric-panel rounded-2xl p-3">
       <p className="text-xs text-gray-500 mb-1">{label}</p>
       <p className={`text-2xl font-semibold ${colors[color] ?? colors.teal}`}>{value}</p>
       {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
@@ -54,13 +54,13 @@ interface BtnProps {
   size?: 'sm' | 'md'; type?: 'button' | 'submit'; className?: string;
 }
 export const Button = ({ children, onClick, disabled, variant = 'primary', size = 'md', type = 'button', className = '' }: BtnProps) => {
-  const base = 'inline-flex items-center justify-center gap-1.5 font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed';
+  const base = 'inline-flex items-center justify-center gap-1.5 font-medium rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed btn-3d';
   const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm' };
   const variants = {
-    primary: 'bg-teal-600 text-white hover:bg-teal-700 active:bg-teal-800',
-    outline: 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50',
-    danger:  'bg-white text-red-600 border border-red-200 hover:bg-red-50',
-    ghost:   'bg-transparent text-gray-600 hover:bg-gray-100',
+    primary: 'bg-teal-500/95 text-white hover:bg-teal-400 active:translate-y-0.5 shadow-[0_8px_24px_rgba(20,184,166,.24)]',
+    outline: 'bg-white/80 text-slate-700 border border-white/70 hover:bg-white',
+    danger:  'bg-white/80 text-red-600 border border-red-200/80 hover:bg-red-50',
+    ghost:   'bg-transparent text-slate-600 hover:bg-white/70',
   };
   return (
     <button type={type} onClick={onClick} disabled={disabled}
@@ -80,7 +80,7 @@ export const Input = ({ label, id, type = 'text', value, onChange, placeholder, 
     {label && <label htmlFor={id} className="text-xs font-medium text-gray-600">{label}</label>}
     <input id={id} type={type} value={value} placeholder={placeholder} required={required}
       onChange={e => onChange(e.target.value)}
-      className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all w-full"
+      className="neo-input"
     />
   </div>
 );
@@ -94,7 +94,7 @@ export const Select = ({ label, value, onChange, options }: SelectProps) => (
   <div className="flex flex-col gap-1">
     {label && <label className="text-xs font-medium text-gray-600">{label}</label>}
     <select value={value} onChange={e => onChange(e.target.value)}
-      className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all w-full cursor-pointer">
+      className="neo-input cursor-pointer">
       {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
   </div>
@@ -120,7 +120,7 @@ export const LiveDot = () => (
 export const AiPredictionCard = ({ predictedTime, confidence, waitMinutes, token }: {
   predictedTime: string; confidence: number; waitMinutes: number; token: number;
 }) => (
-  <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-teal-600 to-teal-700 text-white p-5">
+  <div className="relative overflow-hidden rounded-2xl ai-card-3d text-white p-5">
     <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2" />
     <div className="absolute bottom-0 right-8 w-16 h-16 rounded-full bg-white/5 translate-y-1/2" />
     <div className="relative flex items-start justify-between">
@@ -141,7 +141,7 @@ export const AiPredictionCard = ({ predictedTime, confidence, waitMinutes, token
       </div>
       <div className="bg-white/10 rounded-lg px-3 py-2">
         <p className="text-xs text-teal-200">Model</p>
-        <p className="text-sm font-semibold">Random Forest</p>
+        <p className="text-sm font-semibold">Hybrid ETA Engine</p>
       </div>
     </div>
   </div>

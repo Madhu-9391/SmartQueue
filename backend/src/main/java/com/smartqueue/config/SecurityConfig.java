@@ -36,7 +36,7 @@ public class SecurityConfig {
 
 @Bean
 public PasswordEncoder passwordEncoder() {
-    return new BCryptPasswordEncoder(8);
+    return new BCryptPasswordEncoder(12);
 }
     @Bean
     public AuthenticationProvider authenticationProvider() {
@@ -60,11 +60,15 @@ public PasswordEncoder passwordEncoder() {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
                 .requestMatchers("/ws/**").permitAll()
-                .requestMatchers("/h2-console/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                .requestMatchers("/actuator/**").permitAll()
+                .requestMatchers("/actuator/health").permitAll()
+                .requestMatchers("/actuator/info").permitAll()
                 // BUG 1+10 FIX: all admin endpoints require ADMIN role
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/payments/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/kiosk/**").permitAll()
+                .requestMatchers("/api/queue/create").hasRole("ADMIN")
+                .requestMatchers("/api/queue/*/next").hasAnyRole("ADMIN", "DOCTOR")
                 // BUG 4 FIX: doctor portal requires DOCTOR or ADMIN
                 .requestMatchers("/api/doctor-portal/**").hasAnyRole("DOCTOR","ADMIN")
                 .requestMatchers("/api/audit/**").hasRole("ADMIN")
@@ -74,14 +78,14 @@ public PasswordEncoder passwordEncoder() {
             // BUG 11 FIX: Rate limiter runs before JWT filter
             .addFilterBefore(rateLimitConfig, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-            .headers(h -> h.frameOptions(f -> f.disable()));
+            .headers(h -> h.frameOptions(f -> f.deny()));
         return http.build();
     }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration c = new CorsConfiguration();
-        c.setAllowedOrigins(Arrays.asList(allowedOrigins.split(",")));
+        c.setAllowedOrigins(Arrays.stream(allowedOrigins.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList());
         c.setAllowedMethods(Arrays.asList("GET","POST","PUT","DELETE","OPTIONS","PATCH"));
         c.setAllowedHeaders(List.of("*"));
         c.setAllowCredentials(true);

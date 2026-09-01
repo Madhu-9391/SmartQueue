@@ -133,7 +133,7 @@ class AuthServiceTest {
 @DisplayName("QueueService Tests")
 class QueueServiceTest {
 
-    @Mock QueueRepository queueRepo;
+    @Mock PatientQueueRepository queueRepo;
     @Mock AppointmentRepository appointmentRepo;
     @Mock DoctorRepository doctorRepo;
     @Mock AiPredictionService predictionService;
@@ -144,15 +144,15 @@ class QueueServiceTest {
     QueueService queueService;
 
     private Doctor doctor;
-    private Queue queue;
+    private PatientQueue queue;
     private User user;
 
     @BeforeEach
     void setUp() {
         doctor = Doctor.builder().id(1L).name("Dr. Nair")
                 .avgConsultationTime(15).delayMinutes(0).build();
-        queue  = Queue.builder().id(1L).queueName("OPD").doctor(doctor)
-                .status(Queue.QueueStatus.ACTIVE).currentToken(0).maxCapacity(50).build();
+        queue  = PatientQueue.builder().id(1L).queueName("OPD").doctor(doctor)
+                .status(PatientQueue.QueueStatus.ACTIVE).currentToken(0).maxCapacity(50).build();
         user   = User.builder().id(1L).name("Rahul").email("r@test.com").build();
     }
 
@@ -163,11 +163,11 @@ class QueueServiceTest {
         when(queueRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         QueueCreateRequest req = new QueueCreateRequest("New OPD", 1L, null, 30);
-        Queue result = queueService.createQueue(req);
+        PatientQueue result = queueService.createQueue(req);
 
         assertThat(result.getQueueName()).isEqualTo("New OPD");
         assertThat(result.getMaxCapacity()).isEqualTo(30);
-        assertThat(result.getStatus()).isEqualTo(Queue.QueueStatus.ACTIVE);
+        assertThat(result.getStatus()).isEqualTo(PatientQueue.QueueStatus.ACTIVE);
         verify(queueRepo, times(1)).save(any());
     }
 
@@ -178,7 +178,7 @@ class QueueServiceTest {
         when(queueRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         QueueCreateRequest req = new QueueCreateRequest("OPD", 1L, null, null);
-        Queue result = queueService.createQueue(req);
+        PatientQueue result = queueService.createQueue(req);
 
         assertThat(result.getMaxCapacity()).isEqualTo(50);
     }
@@ -202,7 +202,7 @@ class QueueServiceTest {
                 .tokenNumber(1).priority(Appointment.Priority.NORMAL)
                 .status(Appointment.AppointmentStatus.WAITING).build();
 
-        when(queueRepo.findById(1L)).thenReturn(Optional.of(queue));
+        when(queueRepo.findByIdForUpdate(1L)).thenReturn(Optional.of(queue));
         when(appointmentRepo.findWaitingByQueuePrioritized(1L))
                 .thenReturn(List.of(waiting))
                 .thenReturn(List.of());  // after activation
@@ -222,7 +222,7 @@ class QueueServiceTest {
     @Test
     @DisplayName("callNextToken: throws when queue has no waiting patients")
     void callNextToken_throwsWhenEmpty() {
-        when(queueRepo.findById(1L)).thenReturn(Optional.of(queue));
+        when(queueRepo.findByIdForUpdate(1L)).thenReturn(Optional.of(queue));
         when(appointmentRepo.findWaitingByQueuePrioritized(1L)).thenReturn(List.of());
 
         assertThatThrownBy(() -> queueService.callNextToken(1L))

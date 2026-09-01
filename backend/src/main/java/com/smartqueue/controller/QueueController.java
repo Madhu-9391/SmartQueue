@@ -9,6 +9,10 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
+import com.smartqueue.entity.User;
+import com.smartqueue.repository.UserRepository;
 
 @RestController
 @RequestMapping("/api/queue")
@@ -17,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 public class QueueController {
 
     private final QueueService queueService;
+    private final UserRepository userRepo;
 
     @PostMapping("/create")
     @Operation(summary = "Create a new queue")
@@ -32,7 +37,16 @@ public class QueueController {
 
     @PutMapping("/{queueId}/next")
     @Operation(summary = "Call next token")
-    public ResponseEntity<ApiResponse<AppointmentResponse>> callNext(@PathVariable Long queueId) {
+    public ResponseEntity<ApiResponse<AppointmentResponse>> callNext(@PathVariable Long queueId,
+            @AuthenticationPrincipal UserDetails principal) {
+        if (principal != null) {
+            User user = userRepo.findByEmail(principal.getUsername()).orElseThrow(() -> new RuntimeException("User not found"));
+            if (user.getRole() == User.Role.DOCTOR) {
+                PatientQueue q = queueService.getQueueEntity(queueId);
+                if (q.getDoctor() == null || !principal.getUsername().equalsIgnoreCase(q.getDoctor().getLinkedEmail()))
+                    throw new RuntimeException("Access denied: you can only operate your own queue.");
+            }
+        }
         return ResponseEntity.ok(ApiResponse.ok("Next token called", queueService.callNextToken(queueId)));
     }
 }

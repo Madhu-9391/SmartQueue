@@ -46,6 +46,15 @@ public class DoctorPortalController {
     /**
      * BUG 4 FIX: Doctor can only mark DONE their own appointments.
      */
+    @PutMapping("/{doctorId}/next")
+    public ResponseEntity<ApiResponse<AppointmentResponse>> callNext(
+            @PathVariable Long doctorId,
+            @AuthenticationPrincipal UserDetails principal) {
+        verifyDoctorAccess(doctorId, principal);
+        return ResponseEntity.ok(ApiResponse.ok("Next patient called",
+                portalService.callNext(doctorId)));
+    }
+
     @PutMapping("/{doctorId}/appointments/{appointmentId}/done")
     public ResponseEntity<ApiResponse<AppointmentResponse>> markDone(
             @PathVariable Long doctorId,

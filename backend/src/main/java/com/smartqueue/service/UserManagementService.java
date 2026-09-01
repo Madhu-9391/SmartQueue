@@ -3,6 +3,7 @@ package com.smartqueue.service;
 import com.smartqueue.dto.*;
 import com.smartqueue.entity.User;
 import com.smartqueue.repository.UserRepository;
+import com.smartqueue.repository.AppointmentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -16,6 +17,7 @@ import java.util.stream.Collectors;
 public class UserManagementService {
 
     private final UserRepository userRepo;
+    private final AppointmentRepository appointmentRepo;
     private final PasswordEncoder passwordEncoder;
 
     public List<UserResponse> getAllUsers() {
@@ -68,6 +70,9 @@ public class UserManagementService {
             long adminCount = userRepo.countByRole(User.Role.ADMIN);
             if (adminCount <= 1) throw new RuntimeException("Cannot delete the last admin account.");
         }
+        long appointmentCount = appointmentRepo.countByUserId(id);
+        if (appointmentCount > 0)
+            throw new RuntimeException("Cannot delete a user with appointment history.");
         userRepo.delete(user);
         log.info("User deleted: {}", id);
     }
@@ -76,8 +81,8 @@ public class UserManagementService {
     public void resetPassword(Long id, String newPassword) {
         User user = userRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found: " + id));
-        if (newPassword == null || newPassword.length() < 6)
-            throw new RuntimeException("Password must be at least 6 characters.");
+        if (newPassword == null || newPassword.length() < 12)
+            throw new RuntimeException("Password must be at least 12 characters.");
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepo.save(user);
         log.info("Password reset for user {}", id);

@@ -1,9 +1,10 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useCallback } from 'react';
 import { Client, IMessage } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 
 interface UseSocketOptions {
   queueId?: number;
+  queueIds?: number[];
   doctorId?: number;
   userId?: number;
   onQueueUpdated?: (data: any) => void;
@@ -15,56 +16,55 @@ interface UseSocketOptions {
 
 export const useSocket = (options: UseSocketOptions) => {
   const clientRef = useRef<Client | null>(null);
+  const callbacksRef = useRef(options);
+  callbacksRef.current = options;
+
+  const queueIds = useMemo(() => {
+    const ids = options.queueIds ?? (options.queueId != null ? [options.queueId] : []);
+    return [...new Set(ids.filter((id): id is number => Number.isFinite(id)))].sort((a, b) => a - b);
+  }, [options.queueId, options.queueIds?.join(',')]);
+  const queueKey = queueIds.join(',');
 
   const connect = useCallback(() => {
     const client = new Client({
       webSocketFactory: () => new SockJS('/ws'),
-      reconnectDelay: 5000,
+      reconnectDelay: 3000,
+      heartbeatIncoming: 10000,
+      heartbeatOutgoing: 10000,
+      debug: () => {},
       onConnect: () => {
-        console.log('WebSocket connected');
+        const parse = (msg: IMessage) => {
+          try { return JSON.parse(msg.body)?.payload; } catch { return undefined; }
+        };
+        const current = callbacksRef.current;
 
-        if (options.queueId) {
-          client.subscribe(`/topic/queue/${options.queueId}`, (msg: IMessage) => {
-            const event = JSON.parse(msg.body);
-            options.onQueueUpdated?.(event.payload);
-          });
+        queueIds.forEach((queueId) => {
+          client.subscribe(`/topic/queue/${queueId}`, (msg) => current.onQueueUpdated?.(parse(msg)));
+          client.subscribe(`/topic/token-called/${queueId}`, (msg) => current.onTokenCalled?.(parse(msg)));
+          client.subscribe(`/topic/eta-updated/${queueId}`, (msg) => current.onEtaUpdated?.(parse(msg)));
+        });
 
-          client.subscribe(`/topic/token-called/${options.queueId}`, (msg: IMessage) => {
-            const event = JSON.parse(msg.body);
-            options.onTokenCalled?.(event.payload);
-          });
-
-          client.subscribe(`/topic/eta-updated/${options.queueId}`, (msg: IMessage) => {
-            const event = JSON.parse(msg.body);
-            options.onEtaUpdated?.(event.payload);
-          });
+        if (current.doctorId != null) {
+          client.subscribe(`/topic/doctor-delayed/${current.doctorId}`, (msg) => current.onDoctorDelayed?.(parse(msg)));
         }
-
-        if (options.doctorId) {
-          client.subscribe(`/topic/doctor-delayed/${options.doctorId}`, (msg: IMessage) => {
-            const event = JSON.parse(msg.body);
-            options.onDoctorDelayed?.(event.payload);
-          });
-        }
-
-        if (options.userId) {
-          client.subscribe(`/topic/notifications/${options.userId}`, (msg: IMessage) => {
-            const event = JSON.parse(msg.body);
-            options.onNotification?.(event.payload);
-          });
+        if (current.userId != null) {
+          client.subscribe(`/topic/notifications/${current.userId}`, (msg) => current.onNotification?.(parse(msg)));
         }
       },
-      onDisconnect: () => console.log('WebSocket disconnected'),
-      onStompError: (frame) => console.error('STOMP error:', frame),
+      onStompError: (frame) => console.error('STOMP error', frame.headers?.message ?? 'unknown'),
     });
 
     client.activate();
     clientRef.current = client;
-  }, [options.queueId, options.doctorId, options.userId]);
+  }, [queueKey, options.doctorId, options.userId]);
 
   useEffect(() => {
     connect();
-    return () => { clientRef.current?.deactivate(); };
+    return () => {
+      const client = clientRef.current;
+      clientRef.current = null;
+      void client?.deactivate();
+    };
   }, [connect]);
 
   return { client: clientRef.current };

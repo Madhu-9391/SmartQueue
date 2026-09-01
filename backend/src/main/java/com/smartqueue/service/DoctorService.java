@@ -25,6 +25,12 @@ public class DoctorService {
         return doctorRepo.findAll().stream().map(this::toResponse).collect(Collectors.toList());
     }
 
+    public DoctorResponse getMyDoctor(String email) {
+        return doctorRepo.findByLinkedEmail(email)
+                .map(this::toResponse)
+                .orElseThrow(() -> new RuntimeException("Doctor profile not found"));
+    }
+
     public DoctorResponse getDoctorById(Long id) {
         return toResponse(doctorRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("Doctor not found: " + id)));
@@ -77,9 +83,9 @@ public class DoctorService {
     public void deleteDoctor(Long id) {
         Doctor doctor = doctorRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("Doctor not found: " + id));
-        long active = apptRepo.findWaitingByDoctorId(id).size();
-        if (active > 0)
-            throw new RuntimeException("Cannot delete: " + active + " active/waiting appointments.");
+        long totalAppointments = apptRepo.countByDoctorId(id);
+        if (totalAppointments > 0)
+            throw new RuntimeException("Cannot delete a doctor with appointment history. Set the doctor OFFLINE instead.");
         // Close queues first
         queueRepo.findActiveQueueByDoctorId(id).ifPresent(q -> {
             q.setStatus(PatientQueue.QueueStatus.CLOSED);

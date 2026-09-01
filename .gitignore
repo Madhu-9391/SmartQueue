@@ -122,3 +122,6 @@ build/
 out/
 tmp/
 temp/
+
+!/.env.example
+!**/.env.example

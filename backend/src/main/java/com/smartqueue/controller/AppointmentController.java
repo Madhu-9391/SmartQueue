@@ -25,7 +25,7 @@ public class AppointmentController {
     public ResponseEntity<ApiResponse<AppointmentResponse>> book(
             @Valid @RequestBody AppointmentRequest req,
             @AuthenticationPrincipal UserDetails user) {
-        return ResponseEntity.ok(ApiResponse.ok("Appointment booked",
+        return ResponseEntity.ok(ApiResponse.ok("Appointment created. Payment is required before confirmation.",
                 appointmentService.bookAppointment(req, user.getUsername())));
     }
 

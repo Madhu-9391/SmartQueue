@@ -20,4 +20,6 @@ public class AppointmentResponse {
     private LocalDateTime lastPredictionUpdated;
     private LocalDateTime appointmentDate;
     private LocalDateTime createdAt;
+    private Boolean paymentRequired;
+    private String paymentStatus;
 }

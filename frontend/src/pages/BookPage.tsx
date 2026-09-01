@@ -72,14 +72,14 @@ export const BookPage = () => {
 
 setResult(appointment);
 
-toast("Appointment booked!", "success");
-await loadQueueForDoctor(selectedDoctor);
+toast(appointment.paymentRequired ? "Reservation created — complete payment to confirm." : "Appointment booked!", appointment.paymentRequired ? "info" : "success");
+if (!appointment.paymentRequired) await loadQueueForDoctor(selectedDoctor);
 
-navigate("/payment", {
-    state: {
-        appointment,
-    },
-});
+if (appointment.paymentRequired) {
+  navigate("/payment", { state: { appointment } });
+} else {
+  navigate("/my-queue");
+}
     } catch (err: any) {
       toast(err.response?.data?.message ?? 'Booking failed. Try again.', 'error');
     } finally { setBooking(false); }

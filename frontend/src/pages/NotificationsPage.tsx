@@ -1,106 +1,254 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { notifApi } from '../services/api';
-import { Card, CardTitle, Button, Empty, Spinner } from '../components/UI';
+import { Scene, GlassPanel, HoloMetric } from '../components/ThreeD';
+import { Button, Empty, Spinner } from '../components/UI';
 
 interface Notification {
   id: number;
   message: string;
   type: string;
-  status: string;
+  status: 'UNREAD' | 'READ';
   createdAt: string;
 }
 
-const TYPE_ICON: Record<string, string> = {
-  TOKEN_CALLED:          '🔔',
-  ETA_UPDATED:           '⏰',
-  DOCTOR_DELAYED:        '⏳',
-  APPOINTMENT_CANCELLED: '❌',
-  GENERAL:               '📢',
+const ICON: Record<string, string> = {
+  TOKEN_CALLED: '🔔',
+  ETA_UPDATED: '⏰',
+  DOCTOR_DELAYED: '⏳',
+  APPOINTMENT_CANCELLED: '✕',
+  GENERAL: '✦',
 };
 
-const TYPE_COLOR: Record<string, string> = {
-  TOKEN_CALLED:          'border-l-green-500 bg-green-50',
-  ETA_UPDATED:           'border-l-blue-500 bg-blue-50',
-  DOCTOR_DELAYED:        'border-l-amber-500 bg-amber-50',
-  APPOINTMENT_CANCELLED: 'border-l-red-500 bg-red-50',
-  GENERAL:               'border-l-teal-500 bg-teal-50',
+const formatSmartTime = (value: string) => {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  }).format(date);
 };
 
 export const NotificationsPage = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [marking, setMarking]   = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [marking, setMarking] = useState(false);
+  const [busyId, setBusyId] = useState<number | null>(null);
 
   const fetchNotifications = useCallback(async () => {
     try {
       const res = await notifApi.getAll();
-      setNotifications(res.data?.data ?? []);
-    } catch {}
-    finally { setLoading(false); }
+      const data = res.data?.data ?? [];
+
+      setNotifications(data);
+      return true;
+    } catch (error) {
+      console.error('Failed to fetch notifications:', error);
+      return false;
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
+  useEffect(() => {
+    void fetchNotifications();
+  }, [fetchNotifications]);
+
+  const markOneRead = async (id: number) => {
+    setBusyId(id);
+
+    try {
+      await notifApi.markRead(id);
+
+      // Always reload persisted server state.
+      await fetchNotifications();
+    } catch (error) {
+      console.error(`Failed to mark notification ${id} as read:`, error);
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const markAllRead = async () => {
     setMarking(true);
+
     try {
       await notifApi.markAllRead();
-      setNotifications(n => n.map(x => ({ ...x, status: 'READ' })));
-    } catch {}
-    finally { setMarking(false); }
+
+      // Always reload persisted server state.
+      await fetchNotifications();
+    } catch (error) {
+      console.error('Failed to mark all notifications as read:', error);
+    } finally {
+      setMarking(false);
+    }
   };
 
-  const unreadCount = notifications.filter(n => n.status === 'UNREAD').length;
+  const unreadCount = notifications.filter(
+    (n) => n.status === 'UNREAD'
+  ).length;
 
-  const fmtTime = (iso: string) => new Date(iso).toLocaleString('en-IN', {
-    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
-  });
+  const readCount = notifications.length - unreadCount;
 
-  if (loading) return <div className="flex justify-center py-20"><Spinner size={32} /></div>;
+  if (loading) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center">
+        <Spinner size={32} />
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-gray-800">Notifications</h1>
-          <p className="text-sm text-gray-400 mt-0.5">
-            {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
-          </p>
-        </div>
-        {unreadCount > 0 && (
-          <Button variant="outline" size="sm" onClick={markAllRead} disabled={marking}>
-            {marking ? <Spinner size={12} /> : '✓ Mark all read'}
-          </Button>
-        )}
-      </div>
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      <Scene className="min-h-[190px]">
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.22em] text-cyan-200/70">
+              SMARTQUEUE / SIGNAL CENTER
+            </p>
 
-      <Card>
+            <h1 className="mt-2 text-3xl sm:text-4xl font-black tracking-tight">
+              Notifications
+            </h1>
+
+            <p className="mt-2 text-sm text-slate-300 max-w-xl">
+              Every queue event, delay and payment confirmation in one
+              persistent timeline.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 w-full lg:w-auto lg:min-w-[380px]">
+            <HoloMetric
+              label="Unread"
+              value={unreadCount}
+              detail={unreadCount ? 'Needs attention' : 'All clear'}
+              tone="teal"
+            />
+
+            <HoloMetric
+              label="Read"
+              value={readCount}
+              detail="Already processed"
+              tone="blue"
+            />
+          </div>
+        </div>
+      </Scene>
+
+      <GlassPanel className="p-4 sm:p-5 rounded-3xl">
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div>
+            <h2 className="font-bold text-slate-900">
+              Activity stream
+            </h2>
+
+            <p className="text-xs text-slate-500 mt-1">
+              Read state is stored server-side and survives refreshes.
+            </p>
+          </div>
+
+          {unreadCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={markAllRead}
+              disabled={marking}
+            >
+              {marking ? (
+                <Spinner size={12} />
+              ) : (
+                '✓ Mark all read'
+              )}
+            </Button>
+          )}
+        </div>
+
         {notifications.length === 0 ? (
           <Empty message="No notifications yet." />
         ) : (
-          <div className="flex flex-col gap-2">
-            {notifications.map(n => (
-              <div key={n.id}
-                className={`flex gap-3 p-3 rounded-lg border-l-4 transition-all ${
-                  TYPE_COLOR[n.type] ?? 'border-l-gray-300 bg-gray-50'
-                } ${n.status === 'UNREAD' ? 'opacity-100' : 'opacity-60'}`}>
-                <span className="text-xl flex-shrink-0 mt-0.5">
-                  {TYPE_ICON[n.type] ?? '📢'}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm ${n.status === 'UNREAD' ? 'font-medium text-gray-800' : 'text-gray-600'}`}>
-                    {n.message}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">{fmtTime(n.createdAt)}</p>
-                </div>
-                {n.status === 'UNREAD' && (
-                  <div className="w-2 h-2 rounded-full bg-teal-500 flex-shrink-0 mt-2" />
-                )}
-              </div>
-            ))}
+          <div className="space-y-3">
+            {notifications.map((n) => {
+              const unread = n.status === 'UNREAD';
+
+              return (
+                <article
+                  key={n.id}
+                  className={`notif-card ${
+                    unread ? 'notif-unread' : 'notif-read'
+                  }`}
+                >
+                  <div
+                    className={`w-11 h-11 rounded-2xl flex items-center justify-center text-lg ${
+                      unread
+                        ? 'bg-cyan-400/15 text-cyan-700'
+                        : 'bg-slate-100 text-slate-400'
+                    }`}
+                  >
+                    {ICON[n.type] ?? '✦'}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`text-[10px] font-bold uppercase tracking-wider ${
+                          unread
+                            ? 'text-cyan-700'
+                            : 'text-slate-400'
+                        }`}
+                      >
+                        {n.type.replaceAll('_', ' ')}
+                      </span>
+
+                      {unread && (
+                        <span className="inline-flex w-2 h-2 rounded-full bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,.65)]" />
+                      )}
+                    </div>
+
+                    <p
+                      className={`mt-1 text-sm ${
+                        unread
+                          ? 'font-semibold text-slate-900'
+                          : 'text-slate-600'
+                      }`}
+                    >
+                      {n.message}
+                    </p>
+
+                    <p className="mt-1.5 text-xs text-slate-400">
+                      {formatSmartTime(n.createdAt)} · IST
+                    </p>
+                  </div>
+
+                  {unread && (
+                    <button
+                      onClick={() => markOneRead(n.id)}
+                      disabled={busyId === n.id}
+                      className="self-start text-xs font-semibold text-cyan-700 hover:text-cyan-900 disabled:opacity-50"
+                    >
+                      {busyId === n.id ? '...' : 'Mark read'}
+                    </button>
+                  )}
+
+                  {!unread && (
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      Read
+                    </span>
+                  )}
+                </article>
+              );
+            })}
           </div>
         )}
-      </Card>
+      </GlassPanel>
     </div>
   );
 };
+

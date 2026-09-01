@@ -9,6 +9,8 @@ import java.time.LocalDateTime;
     @Index(name="idx_appt_status",columnList="status"),
     @Index(name="idx_appt_doctor",columnList="doctor_id"),
     @Index(name="idx_appt_queue",columnList="queue_id"),
+    @Index(name="idx_appt_queue_status_token",columnList="queue_id,status,token_number"),
+    @Index(name="idx_appt_doctor_status",columnList="doctor_id,status"),
     @Index(name="idx_appt_user",columnList="user_id"),
     @Index(name="idx_appt_created",columnList="created_at")
 })

@@ -25,6 +25,14 @@ public class NotificationController {
         return ResponseEntity.ok(ApiResponse.ok(notifService.getNotifications(user.getUsername())));
     }
 
+    @PutMapping("/{notificationId}/read")
+    public ResponseEntity<ApiResponse<Void>> markRead(
+            @PathVariable Long notificationId,
+            @AuthenticationPrincipal UserDetails user) {
+        notifService.markRead(notificationId, user.getUsername());
+        return ResponseEntity.ok(ApiResponse.ok("Notification marked read", null));
+    }
+
     @PutMapping("/read-all")
     public ResponseEntity<ApiResponse<Void>> markAllRead(
             @AuthenticationPrincipal UserDetails user) {

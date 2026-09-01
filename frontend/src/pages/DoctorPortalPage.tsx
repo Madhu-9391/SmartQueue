@@ -1,4 +1,5 @@
 import React,{useEffect,useState,useCallback} from 'react';
+import {useAuth} from '../context/AuthContext';
 import {doctorPortalApi,doctorApi,DoctorResponse,DoctorStatsResponse,AppointmentResponse} from '../services/api';
 import {useSocket} from '../hooks/useSocket';
 import {Card,CardTitle,StatCard,Badge,Button,Select,Empty,Spinner} from '../components/UI';
@@ -10,6 +11,7 @@ const PBG:Record<string,string>={EMERGENCY:'bg-red-500',VIP:'bg-purple-500',SENI
 
 export const DoctorPortalPage=()=>{
   const toast=useToast();
+  const {user}=useAuth();
   const[doctors,setDoctors]=useState<DoctorResponse[]>([]);
   const[selectedId,setSelectedId]=useState<number|null>(null);
   const[stats,setStats]=useState<DoctorStatsResponse|null>(null);
@@ -18,9 +20,19 @@ export const DoctorPortalPage=()=>{
   const[actionId,setActionId]=useState<number|null>(null);
 
   const fetchDoctors=useCallback(async()=>{
-    try{const res=await doctorApi.listAll();const list=res.data.data??[];setDoctors(list);if(list.length>0&&!selectedId)setSelectedId(list[0].id);}
+    try{
+      const res=await doctorApi.listAll();
+      const list=res.data.data??[];
+      setDoctors(list);
+      if(user?.role==='DOCTOR'){
+        const me=await doctorApi.getMe();
+        setSelectedId(me.data.data.id);
+      } else if(list.length>0&&!selectedId){
+        setSelectedId(list[0].id);
+      }
+    }
     catch{toast('Could not load doctors','error');}finally{setLoading(false);}
-  },[selectedId]);
+  },[user?.role]);
 
   const fetchData=useCallback(async()=>{
     if(!selectedId)return;
@@ -34,6 +46,12 @@ export const DoctorPortalPage=()=>{
   useEffect(()=>{fetchData();},[fetchData]);
 
   useSocket({onQueueUpdated:fetchData,onEtaUpdated:fetchData,onTokenCalled:(d)=>toast(`Token T-${d.tokenNumber} called`,'info')});
+
+  const callNext=async()=>{
+    if(!selectedId)return;setActionId(-1);
+    try{const res=await doctorPortalApi.callNext(selectedId);toast(`Called T-${String(res.data.data?.tokenNumber??'').padStart(2,'0')}`,'success');fetchData();}
+    catch(e:any){toast(e.response?.data?.message??'No waiting patient','error');}finally{setActionId(null);}
+  };
 
   const markDone=async(apptId:number)=>{
     if(!selectedId)return;setActionId(apptId);
@@ -61,8 +79,9 @@ export const DoctorPortalPage=()=>{
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div><h1 className="text-lg font-semibold text-gray-800">Doctor Portal</h1><p className="text-sm text-gray-400">Manage your queue and track today's performance</p></div>
         <div className="flex gap-2 flex-wrap">
-          {doctors.length>1&&<Select value={String(selectedId??'')} onChange={v=>setSelectedId(parseInt(v))} options={doctors.map(d=>({value:String(d.id),label:d.name}))}/>}
+          {user?.role==='ADMIN'&&doctors.length>1&&<Select value={String(selectedId??'')} onChange={v=>setSelectedId(parseInt(v))} options={doctors.map(d=>({value:String(d.id),label:d.name}))}/>}
           <Select value={selDoc?.availabilityStatus??'AVAILABLE'} onChange={updateAvail} options={AVAIL_OPTS}/>
+          <Button size="sm" onClick={callNext} disabled={actionId!==null}>▶ Call next</Button>
         </div>
       </div>
 
@@ -104,14 +123,19 @@ export const DoctorPortalPage=()=>{
                       <p className="text-xs text-gray-400">±{appt.predictionConfidence??'?'}m</p>
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      {(appt.status==='ACTIVE'||appt.status==='WAITING')&&(
+                      {appt.status==='ACTIVE'&&
                         <Button size="sm" onClick={()=>markDone(appt.id)} disabled={actionId===appt.id}>
                           {actionId===appt.id?<Spinner size={12}/>:'✓ Done'}
                         </Button>
-                      )}
-                      {appt.status==='WAITING'&&(
+                      }
+                      {appt.status==='WAITING'&&
+                        <Button size="sm" onClick={callNext} disabled={actionId!==null}>
+                          {actionId===-1?<Spinner size={12}/>:`Call${idx===0?' now':''}`}
+                        </Button>
+                      }
+                      {(appt.status==='WAITING'||appt.status==='ACTIVE')&&
                         <Button size="sm" variant="ghost" onClick={()=>markNoShow(appt.id)} disabled={actionId===appt.id}>Absent</Button>
-                      )}
+                      }
                     </div>
                   </div>
                 ))}

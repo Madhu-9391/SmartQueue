@@ -3,19 +3,18 @@ package com.smartqueue.service;
 import com.smartqueue.dto.PredictionResult;
 import com.smartqueue.entity.Appointment;
 import com.smartqueue.repository.*;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class MlServiceClient {
 
@@ -29,7 +28,17 @@ public class MlServiceClient {
     @Value("${app.ml.service.enabled:false}")
     private boolean mlEnabled;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
+
+    public MlServiceClient(AiPredictionService fallbackService, ConsultationHistoryRepository historyRepo, AppointmentRepository appointmentRepo) {
+        this.fallbackService = fallbackService;
+        this.historyRepo = historyRepo;
+        this.appointmentRepo = appointmentRepo;
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(1200);
+        factory.setReadTimeout(1800);
+        this.restTemplate = new RestTemplate(factory);
+    }
 
     public PredictionResult predict(Appointment appointment) {
         if (!mlEnabled) {
@@ -89,7 +98,7 @@ public class MlServiceClient {
             int waitMins          = ((Number) body.get("predicted_wait_minutes")).intValue();
             int confWindow        = ((Number) body.get("confidence_window")).intValue();
             String isoTime        = (String) body.get("predicted_visit_time");
-            LocalDateTime predTime = LocalDateTime.parse(isoTime.substring(0, 19));
+            LocalDateTime predTime = now.plusMinutes(waitMins);
 
             log.info("ML service: appt={} wait={}m conf=+-{}m",
                      appointment.getId(), waitMins, confWindow);

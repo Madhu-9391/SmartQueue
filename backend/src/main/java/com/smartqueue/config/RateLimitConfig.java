@@ -12,8 +12,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 
 /**
  * BUG 11 FIX: Per-IP rate limiting using Bucket4j (token bucket algorithm).
@@ -28,7 +29,10 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class RateLimitConfig extends OncePerRequestFilter {
 
-    private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
+    private final Cache<String, Bucket> buckets = Caffeine.newBuilder()
+            .maximumSize(10000)
+            .expireAfterAccess(15, TimeUnit.MINUTES)
+            .build();
 
     @Value("${app.rate.limit.booking:10}")   private int bookingLimit;
     @Value("${app.rate.limit.register:5}")   private int registerLimit;
@@ -37,7 +41,11 @@ public class RateLimitConfig extends OncePerRequestFilter {
 
     private Bucket resolveBucket(String ip, String path) {
         String key = ip + ":" + resolveLimitKey(path);
-        return buckets.computeIfAbsent(key, k -> createBucket(resolveLimit(path)));
+        Bucket bucket = buckets.getIfPresent(key);
+        if (bucket != null) return bucket;
+        Bucket created = createBucket(resolveLimit(path));
+        Bucket existing = buckets.asMap().putIfAbsent(key, created);
+        return existing != null ? existing : created;
     }
 
     private String resolveLimitKey(String path) {
@@ -92,15 +100,12 @@ public class RateLimitConfig extends OncePerRequestFilter {
     }
 
     private String resolveClientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank())
-            return forwarded.split(",")[0].trim();
         return request.getRemoteAddr();
     }
 
     private boolean shouldSkip(String path) {
         return path.startsWith("/swagger-ui") || path.startsWith("/v3/api-docs")
-                || path.startsWith("/h2-console") || path.startsWith("/actuator")
+                || path.startsWith("/actuator")
                 || path.startsWith("/ws");
     }
 }

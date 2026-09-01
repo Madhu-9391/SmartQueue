@@ -40,13 +40,13 @@ export const Navbar = () => {
   const handleLogout = () => { logout(); navigate('/login'); };
 
   return (
-    <nav className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
+    <nav className="sticky top-0 z-50 nav-3d">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-14">
 
           {/* Brand */}
           <Link to="/dashboard" className="flex items-center gap-2.5 flex-shrink-0">
-            <div className="w-8 h-8 rounded-lg bg-teal-600 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 via-cyan-500 to-blue-600 flex items-center justify-center shadow-[0_8px_18px_rgba(8,145,178,.28)] glow-pulse">
               <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                 <path strokeLinecap="round" d="M22 12h-4l-3 9L9 3l-3 9H2"/>
               </svg>

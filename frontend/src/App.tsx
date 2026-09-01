@@ -19,7 +19,7 @@ import { PaymentHistoryPage }         from './pages/PaymentHistoryPage';
 const ProtectedRoute = ({ children, roles }: { children: React.ReactNode; roles?: string[] }) => {
   const { user, loading } = useAuth();
   if (loading) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="min-h-screen flex items-center justify-center">
       <div className="animate-spin w-8 h-8 border-2 border-teal-600 border-t-transparent rounded-full"/>
     </div>
   );
@@ -29,7 +29,7 @@ const ProtectedRoute = ({ children, roles }: { children: React.ReactNode; roles?
 };
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => (
-  <div className="min-h-screen bg-gray-50">
+  <div className="min-h-screen">
     <Navbar/>
     <main>{children}</main>
   </div>

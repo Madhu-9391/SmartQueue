@@ -88,12 +88,12 @@ const DoctorModal = ({ doctor, onClose, onSave }: {
 /* ── Create Staff Modal ───────────────────────────────────────── */
 const StaffModal = ({ onClose, onSave }: { onClose: () => void; onSave: () => void }) => {
   const toast = useToast();
-  const [form, setForm] = useState({ name:'', email:'', password:'doctor@123', role:'DOCTOR', phone:'' });
+  const [form, setForm] = useState({ name:'', email:'', password:'', role:'DOCTOR', phone:'' });
   const [saving, setSaving] = useState(false);
   const set = (k: string) => (v: string) => setForm(f => ({ ...f, [k]: v }));
 
   const submit = async () => {
-    if (!form.name || !form.email) { toast('Name and email required', 'error'); return; }
+    if (!form.name || !form.email || form.password.length < 12) { toast('Name, email and a 12+ character password are required', 'error'); return; }
     setSaving(true);
     try {
       await api.post('/admin/users/create-staff', form);
@@ -115,7 +115,7 @@ const StaffModal = ({ onClose, onSave }: { onClose: () => void; onSave: () => vo
             options={[{value:'DOCTOR',label:'Doctor'},{value:'ADMIN',label:'Admin'}]}/>
           <Input label="Full name" value={form.name} onChange={set('name')} placeholder="Dr. Full Name"/>
           <Input label="Email" type="email" value={form.email} onChange={set('email')} placeholder="doctor@hospital.com"/>
-          <Input label="Password" value={form.password} onChange={set('password')} placeholder="Min 6 chars"/>
+          <Input label="Password" value={form.password} onChange={set('password')} placeholder="Min 12 chars"/>
           <Input label="Phone (optional)" value={form.phone} onChange={set('phone')} placeholder="+91…"/>
           <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 text-xs text-amber-700">
             ⚠️ Only admins can create DOCTOR/ADMIN accounts. Share credentials securely.
@@ -450,7 +450,7 @@ export const AdminPage = () => {
                     <td className="py-3 pr-4 text-gray-400 text-xs">{u.phone??'—'}</td>
                     <td className="py-3">
                       <div className="flex gap-1.5">
-                        <Button size="sm" variant="outline" onClick={()=>setConfirmModal({msg:`Reset password for ${u.name}?`,fn:async()=>{await adminApi.resetPassword(u.id,'password123');toast('Reset to password123','success');}})}>Reset pwd</Button>
+                        <Button size="sm" variant="outline" onClick={()=>{const next=window.prompt(`New password for ${u.name} (12+ characters)`,'');if(next===null)return;if(next.length<12){toast('Password must be at least 12 characters','error');return;}setConfirmModal({msg:`Reset password for ${u.name}?`,fn:async()=>{try{await adminApi.resetPassword(u.id,next);toast('Password reset successfully','success');}catch(e:any){toast(e.response?.data?.message??'Failed','error');}}})}}>Reset pwd</Button>
                         <Button size="sm" variant="danger" onClick={()=>setConfirmModal({msg:`Delete ${u.name}?`,fn:async()=>{try{await adminApi.deleteUser(u.id);toast('Deleted','success');fetchAll();}catch(e:any){toast(e.response?.data?.message??'Failed','error');}}})}>Delete</Button>
                       </div>
                     </td>
@@ -511,8 +511,8 @@ export const AdminPage = () => {
                   {appointments.map((a:any)=>(
                     <tr key={a.id} className="hover:bg-gray-50">
                       <td className="py-2.5 pr-3"><span className="inline-flex w-8 h-8 rounded-lg items-center justify-center text-white text-xs font-bold bg-teal-500">{a.tokenNumber}</span></td>
-                      <td className="py-2.5 pr-3 font-medium text-gray-700">{a.user?.name??'—'}</td>
-                      <td className="py-2.5 pr-3 text-gray-500 text-xs">{a.doctor?.name??'—'}</td>
+                      <td className="py-2.5 pr-3 font-medium text-gray-700">{a.patientName??'—'}</td>
+                      <td className="py-2.5 pr-3 text-gray-500 text-xs">{a.doctorName??'—'}</td>
                       <td className="py-2.5 pr-3"><Badge label={a.priority}/></td>
                       <td className="py-2.5 pr-3"><Badge label={a.status}/></td>
                       <td className="py-2.5 pr-3 text-xs text-gray-400">{a.createdAt?new Date(a.createdAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'—'}</td>
@@ -573,7 +573,7 @@ export const AdminPage = () => {
                         {(payStats.recentPayments ?? []).map((p: any) => (
                           <tr key={p.id} className="hover:bg-gray-50">
                             <td className="py-2.5 pr-4 text-xs font-mono text-gray-500">{p.razorpayPaymentId ?? `PAY-${p.id}`}</td>
-                            <td className="py-2.5 pr-4 text-gray-600">#{p.appointment?.id ?? '—'}</td>
+                            <td className="py-2.5 pr-4 text-gray-600">#{p.appointmentId ?? '—'}</td>
                             <td className="py-2.5 pr-4 text-right font-semibold text-gray-800">₹{Number(p.amount).toFixed(2)}</td>
                             <td className="py-2.5 pr-4">
                               <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${

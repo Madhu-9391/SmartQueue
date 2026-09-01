@@ -4,22 +4,29 @@ Full-stack enterprise hospital queue system: Spring Boot + React + Python ML mic
 
 ---
 
+### Payment, email receipt and time handling
+- Payment is mandatory. An appointment remains `PAYMENT_PENDING` until the backend verifies the Razorpay signature.
+- The appointment enters the live queue only after successful server-side verification.
+- A payment receipt email is sent asynchronously after verification when SMTP is configured.
+- Application business time is explicitly `Asia/Kolkata` (IST) across the JVM, MySQL connection and UI display.
+- Notification read state is persisted in the database and supports both per-notification and mark-all read operations.
+
 ## Features
 
 | Feature | Description |
 |---|---|
-| 🤖 AI ETA Prediction | Random Forest model predicts exact consultation time with ±N min confidence |
+| 🤖 AI ETA Prediction | Hybrid heuristic/ML-ready prediction engine estimates consultation time with ±N min confidence |
 | 📋 Live Queue | Priority-sorted queue (EMERGENCY→VIP→SENIOR→NORMAL) with WebSocket real-time updates |
 | 👨‍⚕️ Doctor Portal | Doctors see their own queue, mark done, mark no-show, update availability |
 | 🏥 Admin Panel | Full CRUD: doctors, users, queues, appointments. Role management, delay updates |
 | 📊 Historical Analytics | 7/14/30-day trends, weekday distribution, doctor performance table |
 | 🔍 Audit Log | Every priority escalation logged with who changed it, when, and why |
-| 💳 Payment Gateway | Razorpay integration with HMAC-SHA256 signature verification, graceful fallback |
+| 💳 Payment Gateway | Razorpay integration with constant-time HMAC-SHA256 signature verification |
 | 📱 SMS + Email | Twilio SMS + Spring Mail notifications (disabled by default, enable via properties) |
 | 📅 Reschedule | Patients can reschedule up to 2 times, carries payment status |
 | ❌ Cancel + Reason | Structured cancellation reasons feed into analytics |
 | ⚠️ Capacity Warnings | Auto-notifies admins when queue reaches 80% capacity |
-| 🖥 Kiosk Mode | `/kiosk` — no-auth tablet mode for walk-in patient self-registration |
+| 🖥 Kiosk Mode | `/kiosk` — public tablet mode for walk-in patient self-registration |
 | 🔄 Rate Limiting | Caffeine cache + configurable rate limits for booking endpoint |
 
 ---
@@ -32,7 +39,6 @@ cd backend
 mvn spring-boot:run
 
 # Starts on http://localhost:8080
-# H2 Console:  http://localhost:8080/h2-console
 # Swagger UI:  http://localhost:8080/swagger-ui.html
 
 # 2. Frontend (Node 18+)
@@ -57,6 +63,10 @@ uvicorn main:app --port 8000
 | Patient | patient@demo.com     | password |
 | Patient | priya@demo.com       | password |
 | Patient | arjun@demo.com       | password |
+| Doctor  | doctor.priya@demo.com | password |
+| Doctor  | doctor.arun@demo.com  | password |
+| Doctor  | doctor.sunita@demo.com | password |
+| Doctor  | doctor.kiran@demo.com | password |
 
 ---
 
@@ -116,6 +126,7 @@ GET    /api/payments/appointment/{id}
 ```
 GET    /api/doctor-portal/my-queue/{doctorId}
 GET    /api/doctor-portal/stats/{doctorId}
+PUT    /api/doctor-portal/{docId}/next
 PUT    /api/doctor-portal/{docId}/appointments/{apptId}/done
 PUT    /api/doctor-portal/{docId}/appointments/{apptId}/no-show
 PUT    /api/doctor-portal/{docId}/availability?status=AVAILABLE
@@ -127,7 +138,7 @@ GET/POST/PUT/DELETE  /api/admin/doctors/**
 GET/PUT/DELETE       /api/admin/users/**
 GET/PUT/DELETE       /api/admin/queues/**
 GET/PUT              /api/admin/appointments/**
-POST                 /api/admin/kiosk/register
+
 POST                 /api/admin/notify/broadcast
 GET                  /api/admin/audit/priority?days=7
 GET                  /api/admin/audit/historical?days=7
@@ -138,11 +149,11 @@ GET                  /api/admin/audit/historical?days=7
 ## Payment Integration (Razorpay)
 
 ```properties
-# application.properties
+# application.properties / environment
 razorpay.key.id=rzp_test_YOUR_KEY_ID
 razorpay.key.secret=YOUR_KEY_SECRET
 razorpay.consultation.fee=200.00
-app.payment.required=false   # set true to enforce payment before queue entry
+app.payment.required=true    # payment is mandatory before queue confirmation
 ```
 
 Flow:
@@ -184,6 +195,11 @@ Events that trigger notifications:
 docker-compose up --build
 # Frontend:   http://localhost:3000
 # Backend:    http://localhost:8080
-# ML Service: http://localhost:8000
+# ML Service: internal Docker network only
 # MySQL:      localhost:3306
+# Set MYSQL_ROOT_PASSWORD, SPRING_DATASOURCE_PASSWORD and APP_JWT_SECRET before deployment.
 ```
+
+## Payment Flow
+
+Payment is mandatory for appointment confirmation. Booking creates only a `PAYMENT_PENDING` reservation. No appointment-booked notification, live-queue WebSocket update, or queue confirmation is emitted until Razorpay payment verification succeeds.

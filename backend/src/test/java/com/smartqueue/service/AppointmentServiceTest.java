@@ -21,11 +21,11 @@ import static org.mockito.Mockito.*;
 class AppointmentServiceTest {
 
     @Mock AppointmentRepository appointmentRepo;
-    @Mock QueueRepository queueRepo;
+    @Mock PatientQueueRepository queueRepo;
     @Mock UserRepository userRepo;
     @Mock DoctorRepository doctorRepo;
     @Mock AiPredictionService predictionService;
-    @Mock NotificationService notifService;
+    @Mock NotificationDispatchService notifService;
     @Mock SocketEventPublisher publisher;
 
     @InjectMocks
@@ -33,7 +33,7 @@ class AppointmentServiceTest {
 
     private User user;
     private Doctor doctor;
-    private Queue queue;
+    private PatientQueue queue;
 
     @BeforeEach
     void setUp() {
@@ -45,18 +45,19 @@ class AppointmentServiceTest {
                 .id(1L).name("Dr. Nair").specialization("Cardiology")
                 .avgConsultationTime(15).delayMinutes(0).build();
 
-        queue = Queue.builder()
+        queue = PatientQueue.builder()
                 .id(1L).queueName("Cardiology OPD").doctor(doctor)
-                .status(Queue.QueueStatus.ACTIVE).maxCapacity(50).build();
+                .status(PatientQueue.QueueStatus.ACTIVE).maxCapacity(50).build();
     }
 
     @Test
-    @DisplayName("bookAppointment: assigns token number based on waiting count")
+    @DisplayName("bookAppointment: assigns a unique token number after the highest live token")
     void book_assignsCorrectTokenNumber() {
         when(userRepo.findByEmail("rahul@test.com")).thenReturn(Optional.of(user));
         when(doctorRepo.findById(1L)).thenReturn(Optional.of(doctor));
-        when(queueRepo.findById(1L)).thenReturn(Optional.of(queue));
-        when(appointmentRepo.countWaitingByQueueId(1L)).thenReturn(4L);
+        when(queueRepo.findByIdForUpdate(1L)).thenReturn(Optional.of(queue));
+        when(appointmentRepo.countLiveByQueueId(1L)).thenReturn(4L);
+        when(appointmentRepo.findMaxLiveTokenByQueueId(1L)).thenReturn(4);
 
         PredictionResult pred = PredictionResult.builder()
                 .predictedVisitTime(LocalDateTime.now().plusMinutes(60))
@@ -74,7 +75,7 @@ class AppointmentServiceTest {
         AppointmentRequest req = new AppointmentRequest(1L, 1L, null, "NORMAL");
         AppointmentResponse resp = appointmentService.bookAppointment(req, "rahul@test.com");
 
-        // Token = waiting + 1 = 5
+        // Token follows the highest live token = 5
         assertThat(captor.getValue().getTokenNumber()).isEqualTo(5);
         assertThat(resp.getTokenNumber()).isEqualTo(5);
     }
@@ -85,8 +86,8 @@ class AppointmentServiceTest {
         queue.setMaxCapacity(10);
         when(userRepo.findByEmail("rahul@test.com")).thenReturn(Optional.of(user));
         when(doctorRepo.findById(1L)).thenReturn(Optional.of(doctor));
-        when(queueRepo.findById(1L)).thenReturn(Optional.of(queue));
-        when(appointmentRepo.countWaitingByQueueId(1L)).thenReturn(10L); // at capacity
+        when(queueRepo.findByIdForUpdate(1L)).thenReturn(Optional.of(queue));
+        when(appointmentRepo.countLiveByQueueId(1L)).thenReturn(10L); // at capacity
 
         AppointmentRequest req = new AppointmentRequest(1L, 1L, null, "NORMAL");
 
@@ -100,8 +101,9 @@ class AppointmentServiceTest {
     void book_setsEmergencyPriority() {
         when(userRepo.findByEmail("rahul@test.com")).thenReturn(Optional.of(user));
         when(doctorRepo.findById(1L)).thenReturn(Optional.of(doctor));
-        when(queueRepo.findById(1L)).thenReturn(Optional.of(queue));
-        when(appointmentRepo.countWaitingByQueueId(1L)).thenReturn(2L);
+        when(queueRepo.findByIdForUpdate(1L)).thenReturn(Optional.of(queue));
+        when(appointmentRepo.countLiveByQueueId(1L)).thenReturn(2L);
+        when(appointmentRepo.findMaxLiveTokenByQueueId(1L)).thenReturn(2);
 
         PredictionResult pred = PredictionResult.builder()
                 .predictedVisitTime(LocalDateTime.now().plusMinutes(5))
@@ -127,8 +129,9 @@ class AppointmentServiceTest {
     void book_storesPrediction() {
         when(userRepo.findByEmail("rahul@test.com")).thenReturn(Optional.of(user));
         when(doctorRepo.findById(1L)).thenReturn(Optional.of(doctor));
-        when(queueRepo.findById(1L)).thenReturn(Optional.of(queue));
-        when(appointmentRepo.countWaitingByQueueId(1L)).thenReturn(0L);
+        when(queueRepo.findByIdForUpdate(1L)).thenReturn(Optional.of(queue));
+        when(appointmentRepo.countLiveByQueueId(1L)).thenReturn(0L);
+        when(appointmentRepo.findMaxLiveTokenByQueueId(1L)).thenReturn(0);
 
         LocalDateTime predictedTime = LocalDateTime.now().plusMinutes(20);
         PredictionResult pred = PredictionResult.builder()
@@ -157,8 +160,9 @@ class AppointmentServiceTest {
     void book_publishesEventsAndNotifications() {
         when(userRepo.findByEmail("rahul@test.com")).thenReturn(Optional.of(user));
         when(doctorRepo.findById(1L)).thenReturn(Optional.of(doctor));
-        when(queueRepo.findById(1L)).thenReturn(Optional.of(queue));
-        when(appointmentRepo.countWaitingByQueueId(1L)).thenReturn(1L);
+        when(queueRepo.findByIdForUpdate(1L)).thenReturn(Optional.of(queue));
+        when(appointmentRepo.countLiveByQueueId(1L)).thenReturn(1L);
+        when(appointmentRepo.findMaxLiveTokenByQueueId(1L)).thenReturn(1);
         when(predictionService.predict(any())).thenReturn(PredictionResult.builder()
                 .predictedVisitTime(LocalDateTime.now().plusMinutes(15))
                 .confidenceMinutes(5).estimatedWaitMinutes(15)
@@ -189,7 +193,7 @@ class AppointmentServiceTest {
         when(appointmentRepo.save(any())).thenReturn(appt);
         when(predictionService.recalculateQueuePredictions(anyLong())).thenReturn(List.of());
 
-        appointmentService.cancelAppointment(1L, "rahul@test.com");
+        appointmentService.cancelAppointment(1L, "rahul@test.com", "Patient requested cancellation");
 
         assertThat(appt.getStatus()).isEqualTo(Appointment.AppointmentStatus.CANCELLED);
         verify(publisher, times(1)).publishQueueUpdated(1L);
@@ -199,7 +203,7 @@ class AppointmentServiceTest {
     @DisplayName("cancelAppointment: throws when appointment not found")
     void cancel_throwsWhenNotFound() {
         when(appointmentRepo.findById(999L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> appointmentService.cancelAppointment(999L, "rahul@test.com"))
+        assertThatThrownBy(() -> appointmentService.cancelAppointment(999L, "rahul@test.com", "Patient requested cancellation"))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("not found");
     }

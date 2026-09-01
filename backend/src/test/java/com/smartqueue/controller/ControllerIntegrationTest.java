@@ -28,7 +28,7 @@ class ControllerIntegrationTest {
     @Autowired ObjectMapper mapper;
     @Autowired UserRepository userRepo;
     @Autowired DoctorRepository doctorRepo;
-    @Autowired QueueRepository queueRepo;
+    @Autowired PatientQueueRepository queueRepo;
     @Autowired PasswordEncoder passwordEncoder;
 
     private static String patientToken;
@@ -48,8 +48,8 @@ class ControllerIntegrationTest {
                 .specialization("General").avgConsultationTime(10).delayMinutes(0)
                 .availabilityStatus(Doctor.AvailabilityStatus.AVAILABLE).build());
 
-        Queue q = queueRepo.save(Queue.builder().queueName("Test OPD").doctor(doc)
-                .status(Queue.QueueStatus.ACTIVE).maxCapacity(50).currentToken(0).build());
+        PatientQueue q = queueRepo.save(PatientQueue.builder().queueName("Test OPD").doctor(doc)
+                .status(PatientQueue.QueueStatus.ACTIVE).maxCapacity(50).currentToken(0).build());
         queueId = q.getId();
     }
 

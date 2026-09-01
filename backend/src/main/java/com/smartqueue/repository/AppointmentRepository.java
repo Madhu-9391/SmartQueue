@@ -23,8 +23,17 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     @Query("SELECT COUNT(a) FROM Appointment a WHERE a.queue.id=:queueId AND a.status='WAITING'")
     Long countWaitingByQueueId(@Param("queueId") Long queueId);
 
+    @Query("SELECT COUNT(a) FROM Appointment a WHERE a.queue.id=:queueId AND a.status IN ('WAITING','PAYMENT_PENDING')")
+    Long countLiveByQueueId(@Param("queueId") Long queueId);
+
+    @Query("SELECT COALESCE(MAX(a.tokenNumber), 0) FROM Appointment a WHERE a.queue.id=:queueId AND a.status IN ('WAITING','ACTIVE','PAYMENT_PENDING')")
+    Integer findMaxLiveTokenByQueueId(@Param("queueId") Long queueId);
+
     @Query("SELECT COUNT(a) FROM Appointment a WHERE a.status='WAITING'")
     Long countAllWaiting();
+
+    long countByDoctorId(Long doctorId);
+    long countByUserId(Long userId);
 
     @Query("SELECT COUNT(a) FROM Appointment a WHERE a.status='COMPLETED' AND a.actualEndTime>=:since")
     Long countAllCompletedSince(@Param("since") LocalDateTime since);
@@ -64,7 +73,27 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
 
     @Query("SELECT a.priority, COUNT(a) FROM Appointment a WHERE a.createdAt>=:since GROUP BY a.priority")
     List<Object[]> countByPrioritySince(@Param("since") LocalDateTime since);
-
+@Query("""
+    SELECT a.createdAt, a.actualStartTime
+    FROM Appointment a
+    WHERE a.status = 'COMPLETED'
+      AND a.actualStartTime IS NOT NULL
+      AND a.createdAt IS NOT NULL
+      AND a.actualStartTime >= :since
+    """)
+List<Object[]> findCompletedTimingsSince(
+        @Param("since") LocalDateTime since
+);
+@Query("""
+    SELECT d.name,
+           d.avgConsultationTime,
+           COUNT(a)
+    FROM Doctor d
+    LEFT JOIN d.appointments a
+        ON a.status = 'WAITING'
+    GROUP BY d.id, d.name, d.avgConsultationTime
+    """)
+List<Object[]> findDoctorWaitingLoads();
     @Query(value="SELECT HOUR(a.actual_end_time), COUNT(*) FROM appointments a WHERE a.status='COMPLETED' AND a.actual_end_time>=:since GROUP BY HOUR(a.actual_end_time) ORDER BY HOUR(a.actual_end_time)", nativeQuery=true)
     List<Object[]> countCompletedByHourSince(@Param("since") LocalDateTime since);
 }

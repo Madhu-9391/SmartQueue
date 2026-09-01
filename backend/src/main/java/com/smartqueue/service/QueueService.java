@@ -43,6 +43,15 @@ public class QueueService {
         return queueRepo.save(queue);
     }
 
+    public PatientQueue getQueueEntity(Long queueId) {
+        return queueRepo.findById(queueId).orElseThrow(() -> new RuntimeException("Queue not found"));
+    }
+
+    public PatientQueue getActiveQueueEntityByDoctorId(Long doctorId) {
+        return queueRepo.findActiveQueueByDoctorId(doctorId)
+                .orElseThrow(() -> new RuntimeException("Active queue not found for doctor"));
+    }
+
     public List<QueueStatusResponse> getAllQueues() {
         return queueRepo.findAll().stream().map(q -> {
             List<Appointment> waiting = appointmentRepo.findWaitingByQueuePrioritized(q.getId());
@@ -76,7 +85,7 @@ public class QueueService {
 
     @Transactional
     public AppointmentResponse callNextToken(Long queueId) {
-        PatientQueue queue = queueRepo.findById(queueId)
+        PatientQueue queue = queueRepo.findByIdForUpdate(queueId)
                 .orElseThrow(() -> new RuntimeException("Queue not found"));
         if (queue.getStatus() != PatientQueue.QueueStatus.ACTIVE) {
             throw new RuntimeException("Queue is not active");
@@ -103,7 +112,6 @@ public class QueueService {
         queueRepo.save(queue);
 
         // Recalculate remaining ETAs
-        List<Appointment> remaining = appointmentRepo.findWaitingByQueuePrioritized(queueId);
         List<Appointment> updated  = predictionService.recalculateQueuePredictions(queueId);
         appointmentRepo.saveAll(updated);
 
