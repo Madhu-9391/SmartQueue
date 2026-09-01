@@ -27,13 +27,7 @@ export const useSocket = (options: UseSocketOptions) => {
 
   const connect = useCallback(() => {
     const client = new Client({
-      const wsBaseUrl = import.meta.env.VITE_WS_BASE_URL;
-
-if (!wsBaseUrl) {
-  throw new Error('VITE_WS_BASE_URL is not configured');
-}
-
-webSocketFactory: () => new SockJS(wsBaseUrl),
+      webSocketFactory: () => new SockJS('/ws'),
       reconnectDelay: 3000,
       heartbeatIncoming: 10000,
       heartbeatOutgoing: 10000,
