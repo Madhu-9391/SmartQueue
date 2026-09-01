@@ -2,6 +2,15 @@ import { useEffect, useMemo, useRef, useCallback } from 'react';
 import { Client, IMessage } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 
+declare global {
+  interface ImportMetaEnv {
+    readonly VITE_WS_BASE_URL: string;
+  }
+  interface ImportMeta {
+    readonly env: ImportMetaEnv;
+  }
+}
+
 interface UseSocketOptions {
   queueId?: number;
   queueIds?: number[];
@@ -26,12 +35,19 @@ export const useSocket = (options: UseSocketOptions) => {
   const queueKey = queueIds.join(',');
 
   const connect = useCallback(() => {
-    const client = new Client({
-      webSocketFactory: () => new SockJS('/ws'),
-      reconnectDelay: 3000,
-      heartbeatIncoming: 10000,
-      heartbeatOutgoing: 10000,
-      debug: () => {},
+    const wsBaseUrl = import.meta.env.VITE_WS_BASE_URL;
+
+if (!wsBaseUrl) {
+  throw new Error('VITE_WS_BASE_URL is not configured');
+}
+
+const client = new Client({
+  webSocketFactory: () => new SockJS(wsBaseUrl),
+  reconnectDelay: 3000,
+  heartbeatIncoming: 10000,
+  heartbeatOutgoing: 10000,
+  debug: () => {},
+
       onConnect: () => {
         const parse = (msg: IMessage) => {
           try { return JSON.parse(msg.body)?.payload; } catch { return undefined; }
